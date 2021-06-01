@@ -171,7 +171,7 @@ vestFundsC vesting = do
 data Liveness = Alive | Dead
 
 retrieveFundsC
-    :: ( HasAwaitSlot s
+    :: ( HasAwaitTime s
        , HasUtxoAt s
        , HasWriteTx s
        )
@@ -181,12 +181,12 @@ retrieveFundsC
 retrieveFundsC vesting payment = do
     let inst = scriptInstance vesting
         addr = Scripts.scriptAddress inst
-    nextTime <- TimeSlot.slotToPOSIXTime <$> awaitSlot 0
+    time <- currentTime
     unspentOutputs <- utxoAt addr
     let
         currentlyLocked = foldMap (Validation.txOutValue . Tx.txOutTxOut . snd) (Map.toList unspentOutputs)
         remainingValue = currentlyLocked - payment
-        mustRemainLocked = totalAmount vesting - availableAt vesting nextTime
+        mustRemainLocked = totalAmount vesting - availableAt vesting time
         maxPayment = currentlyLocked - mustRemainLocked
 
     when (remainingValue `Value.lt` mustRemainLocked)
@@ -207,7 +207,7 @@ retrieveFundsC vesting payment = do
                             Dead  -> mempty
         tx = Typed.collectFromScript unspentOutputs ()
                 <> remainingOutputs
-                <> mustValidateIn (Interval.from nextTime)
+                <> mustValidateIn (Interval.from time)
                 <> mustBeSignedBy (vestingOwner vesting)
                 -- we don't need to add a pubkey output for 'vestingOwner' here
                 -- because this will be done by the wallet when it balances the

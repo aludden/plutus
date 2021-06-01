@@ -281,7 +281,7 @@ marlowePlutusContract = do
         maybeState <- SM.getOnChainState theClient
         case maybeState of
             Nothing -> do
-                wr <- SM.waitForUpdateUntil theClient untilSlot
+                wr <- SM.waitForUpdateUntil theClient (TimeSlot.slotToPOSIXTime untilSlot)
                 case wr of
                     ContractEnded -> do
                         logInfo @String $ "Contract Ended for party " <> show party
@@ -324,7 +324,7 @@ marlowePlutusContract = do
                 continueWith marloweData
             WaitOtherActionUntil timeout -> do
                 logInfo @String $ "WaitOtherActionUntil " <> show timeout
-                wr <- SM.waitForUpdateUntil theClient timeout
+                wr <- SM.waitForUpdateUntil theClient (TimeSlot.slotToPOSIXTime timeout)
                 case wr of
                     ContractEnded -> do
                         logInfo @String $ "Contract Ended"

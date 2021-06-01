@@ -222,7 +222,7 @@ auctionSeller value time = do
             (SM.runInitialise client (initialState self) value)
 
     logInfo $ AuctionStarted params
-    _ <- awaitSlot $ TimeSlot.posixTimeToSlot time
+    _ <- awaitTime time
 
     r <- SM.runStep client Payout
     case r of
@@ -265,16 +265,17 @@ data BuyerEvent =
 
 waitForChange :: AuctionParams -> StateMachineClient AuctionState AuctionInput -> HighestBid -> Contract AuctionOutput BuyerSchema AuctionError BuyerEvent
 waitForChange AuctionParams{apEndTime} client lastHighestBid = do
-    s <- currentSlot
+    time <- currentTime
     let
-        auctionOver = awaitSlot (TimeSlot.posixTimeToSlot apEndTime) >> pure (AuctionIsOver lastHighestBid)
+        auctionOver = awaitTime apEndTime >> pure (AuctionIsOver lastHighestBid)
         submitOwnBid = SubmitOwnBid <$> endpoint @"bid"
         otherBid = do
             let address = Scripts.scriptAddress (validatorInstance (SM.scInstance client))
-                targetSlot = Haskell.succ (Haskell.succ s) -- FIXME (jm): There is some off-by-one thing going on that requires us to
-                                           -- use succ.succ instead of just a single succ if we want 'addressChangeRequest'
-                                           -- to wait for the next slot to begin.
-                                           -- I don't have the time to look into that atm though :(
+                -- FIXME (jm): There is some off-by-one thing going on that requires us to
+                -- use succ.succ instead of just a single succ if we want 'addressChangeRequest'
+                -- to wait for the next time to begin.
+                -- I don't have the time to look into that atm though :(
+                targetSlot = Haskell.succ (Haskell.succ $ TimeSlot.posixTimeToSlot time)
             AddressChangeResponse{acrTxns} <- addressChangeRequest
                 AddressChangeRequest
                 { acreqSlotRangeFrom = targetSlot
@@ -323,6 +324,6 @@ auctionBuyer currency params = do
         Just s -> loop s
 
         -- If the state can't be found we wait for it to appear.
-        Nothing -> SM.waitForUpdateUntil client (TimeSlot.posixTimeToSlot $ apEndTime params) >>= \case
+        Nothing -> SM.waitForUpdateUntil client (apEndTime params) >>= \case
             WaitingResult (Ongoing s) -> loop s
             _                         -> logWarn CurrentStateNotFound

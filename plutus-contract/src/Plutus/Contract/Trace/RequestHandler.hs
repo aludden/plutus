@@ -20,6 +20,7 @@ module Plutus.Contract.Trace.RequestHandler(
     -- * handlers for common requests
     , handleOwnPubKey
     , handleSlotNotifications
+    , handleTimeNotifications
     , handlePendingTransactions
     , handleUtxoQueries
     , handleTxConfirmedQueries
@@ -48,9 +49,10 @@ import           Plutus.Contract.Resumable                (Request (..), Respons
 
 import           Control.Monad.Freer.Extras.Log           (LogMessage, LogMsg, LogObserve, logDebug, logWarn,
                                                            surroundDebug)
-import           Ledger                                   (Address, OnChainTx (..), PubKey, Slot, Tx, TxId)
+import           Ledger                                   (Address, OnChainTx (..), POSIXTime, PubKey, Slot, Tx, TxId)
 import           Ledger.AddressMap                        (AddressMap (..))
 import           Ledger.Constraints.OffChain              (UnbalancedTx (unBalancedTxTx))
+import qualified Ledger.TimeSlot                          as TimeSlot
 import           Plutus.Contract.Effects.AwaitTxConfirmed (TxConfirmed (..))
 import           Plutus.Contract.Effects.Instance         (OwnIdRequest)
 import           Plutus.Contract.Effects.UtxoAt           (UtxoAtAddress (..))
@@ -123,9 +125,24 @@ handleSlotNotifications =
     RequestHandler $ \targetSlot_ ->
         surroundDebug @Text "handleSlotNotifications" $ do
             currentSlot <- Wallet.Effects.walletSlot
-            logDebug $ SlotNoficationTargetVsCurrent targetSlot_ currentSlot
+            logDebug $ SlotNoticationTargetVsCurrent targetSlot_ currentSlot
             guard (currentSlot >= targetSlot_)
             pure currentSlot
+
+handleTimeNotifications ::
+    forall effs.
+    ( Member WalletEffect effs
+    , Member (LogObserve (LogMessage Text)) effs
+    , Member (LogMsg RequestHandlerLogMsg) effs
+    )
+    => RequestHandler effs POSIXTime POSIXTime
+handleTimeNotifications =
+    RequestHandler $ \targetTime_ ->
+        surroundDebug @Text "handleTimeNotifications" $ do
+            currentTime <- TimeSlot.slotToPOSIXTime <$> Wallet.Effects.walletSlot
+            logDebug $ TimeNoticationTargetVsCurrent targetTime_ currentTime
+            guard (currentTime >= targetTime_)
+            pure currentTime
 
 handlePendingTransactions ::
     forall effs.

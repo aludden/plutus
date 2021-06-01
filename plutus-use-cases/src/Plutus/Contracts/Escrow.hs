@@ -219,7 +219,7 @@ escrowContract escrow =
         payAndRefund = do
             vl <- endpoint @"pay-escrow"
             _ <- pay inst escrow vl
-            _ <- awaitSlot (TimeSlot.posixTimeToSlot $ escrowDeadline escrow)
+            _ <- awaitTime (escrowDeadline escrow)
             refund inst escrow
     in void payAndRefund `select` void (redeemEp escrow)
 
@@ -255,7 +255,7 @@ pay ::
 pay inst escrow vl = mapError (review _EContractError) $ do
     pk <- ownPubKey
     let tx = Constraints.mustPayToTheScript (Ledger.pubKeyHash pk) vl
-                <> Constraints.mustValidateIn (Ledger.interval 1 (escrowDeadline escrow))
+                <> Constraints.mustValidateIn (Ledger.interval (TimeSlot.slotToPOSIXTime 1) (escrowDeadline escrow))
     txId <$> submitTxConstraints inst tx
 
 newtype RedeemSuccess = RedeemSuccess TxId
@@ -265,7 +265,7 @@ newtype RedeemSuccess = RedeemSuccess TxId
 redeemEp ::
     forall w s e.
     ( HasUtxoAt s
-    , HasAwaitSlot s
+    , HasAwaitTime s
     , HasWriteTx s
     , HasEndpoint "redeem-escrow" () s
     , AsEscrowError e
@@ -281,7 +281,7 @@ redeemEp escrow =
 redeem ::
     forall w s e.
     ( HasUtxoAt s
-    , HasAwaitSlot s
+    , HasAwaitTime s
     , HasWriteTx s
     , AsEscrowError e
     )
@@ -290,14 +290,14 @@ redeem ::
     -> Contract w s e RedeemSuccess
 redeem inst escrow = mapError (review _EscrowError) $ do
     let addr = Scripts.scriptAddress inst
-    current <- currentSlot
+    current <- currentTime
     unspentOutputs <- utxoAt addr
     let
         valRange = Interval.to (Haskell.pred $ escrowDeadline escrow)
         tx = Typed.collectFromScript unspentOutputs Redeem
                 <> foldMap mkTx (escrowTargets escrow)
                 <> Constraints.mustValidateIn valRange
-    if current >= TimeSlot.posixTimeToSlot (escrowDeadline escrow)
+    if current >= escrowDeadline escrow
     then throwing _RedeemFailed DeadlinePassed
     else if foldMap (Tx.txOutValue . Tx.txOutTxOut) unspentOutputs `lt` targetTotal escrow
          then throwing _RedeemFailed NotEnoughFundsAtAddress
@@ -345,7 +345,7 @@ payRedeemRefund ::
     forall w s.
     ( HasUtxoAt s
     , HasWriteTx s
-    , HasAwaitSlot s
+    , HasAwaitTime s
     , HasOwnPubKey s
     )
     => EscrowParams Datum
@@ -355,7 +355,7 @@ payRedeemRefund params vl = do
     let inst = scriptInstance params
     -- Pay the value 'vl' into the contract
     _ <- pay inst params vl
-    outcome <- selectEither (awaitSlot (TimeSlot.posixTimeToSlot $ escrowDeadline params)) (fundsAtAddressGeq (Scripts.scriptAddress inst) (targetTotal params))
+    outcome <- selectEither (awaitTime (escrowDeadline params)) (fundsAtAddressGeq (Scripts.scriptAddress inst) (targetTotal params))
     -- wait
     -- for the 'targetTotal' of the contract to appear at the address, or
     -- for the 'escrowDeadline' to pass, whichever happens first.

@@ -30,7 +30,6 @@ import qualified Ledger.Constraints       as Constraints
 import           Ledger.Contexts          (ScriptContext (..), TxInfo (..))
 import           Ledger.Interval          (after, before)
 import qualified Ledger.Interval          as Interval
-import qualified Ledger.TimeSlot          as TimeSlot
 import qualified Ledger.Tx                as Tx
 import qualified Ledger.Typed.Scripts     as Scripts
 import           Ledger.Value             (Value, geq)
@@ -139,7 +138,7 @@ redeemEp :: Contract () EscrowSchema EscrowError RedeemSuccess
 redeemEp = mapError (review _EscrowError) $ endpoint @"redeem" >>= redeem
   where
     redeem params = do
-      slot <- currentSlot
+      time <- currentTime
       pk <- ownPubKey
       unspentOutputs <- utxoAt escrowAddress
 
@@ -151,7 +150,7 @@ redeemEp = mapError (review _EscrowError) $ endpoint @"redeem" >>= redeem
                       -- Pay the payee their due
                       <> Constraints.mustPayToPubKey (payee params) (expecting params)
 
-      if slot >= TimeSlot.posixTimeToSlot (deadline params)
+      if time >= deadline params
       then throwing _RedeemFailed DeadlinePassed
       else RedeemSuccess . txId <$> do submitTxConstraintsSpending escrowInstance unspentOutputs tx
 

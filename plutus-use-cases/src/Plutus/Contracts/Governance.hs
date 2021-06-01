@@ -42,7 +42,6 @@ import           Ledger                       (MonetaryPolicyHash, POSIXTime, Pu
 import           Ledger.Constraints           (TxConstraints)
 import qualified Ledger.Constraints           as Constraints
 import qualified Ledger.Interval              as Interval
-import qualified Ledger.TimeSlot              as TimeSlot
 import qualified Ledger.Typed.Scripts         as Scripts
 import qualified Ledger.Value                 as Value
 import           Plutus.Contract
@@ -219,7 +218,7 @@ proposalContract params proposal = mapError (review _GovError) propose where
         void $ SM.runStep theClient (ProposeChange proposal)
 
         logInfo @Text "Voting started. Waiting for the voting deadline to count the votes."
-        void $ awaitSlot (TimeSlot.posixTimeToSlot $ votingDeadline proposal)
+        void $ awaitTime (votingDeadline proposal)
 
         logInfo @Text "Voting finished. Counting the votes."
         void $ SM.runStep theClient FinishVoting

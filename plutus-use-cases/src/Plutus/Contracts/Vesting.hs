@@ -38,7 +38,6 @@ import           Ledger.Constraints       (TxConstraints, mustBeSignedBy, mustPa
 import           Ledger.Contexts          (ScriptContext (..), TxInfo (..))
 import qualified Ledger.Contexts          as Validation
 import qualified Ledger.Interval          as Interval
-import qualified Ledger.TimeSlot          as TimeSlot
 import qualified Ledger.Tx                as Tx
 import           Ledger.Typed.Scripts     (ScriptType (..))
 import qualified Ledger.Typed.Scripts     as Scripts
@@ -196,7 +195,7 @@ vestFundsC vesting = mapError (review _VestingError) $ do
 data Liveness = Alive | Dead
 
 retrieveFundsC
-    :: ( HasAwaitSlot s
+    :: ( HasAwaitTime s
        , HasUtxoAt s
        , HasWriteTx s
        , AsVestingError e
@@ -207,12 +206,12 @@ retrieveFundsC
 retrieveFundsC vesting payment = mapError (review _VestingError) $ do
     let inst = scriptInstance vesting
         addr = Scripts.scriptAddress inst
-    nextTime <- TimeSlot.slotToPOSIXTime <$> awaitSlot 0
+    time <- currentTime
     unspentOutputs <- utxoAt addr
     let
         currentlyLocked = foldMap (Validation.txOutValue . Tx.txOutTxOut . snd) (Map.toList unspentOutputs)
         remainingValue = currentlyLocked - payment
-        mustRemainLocked = totalAmount vesting - availableAt vesting nextTime
+        mustRemainLocked = totalAmount vesting - availableAt vesting time
         maxPayment = currentlyLocked - mustRemainLocked
 
     when (remainingValue `Value.lt` mustRemainLocked)
@@ -225,7 +224,7 @@ retrieveFundsC vesting payment = mapError (review _VestingError) $ do
                             Dead  -> mempty
         tx = Typed.collectFromScript unspentOutputs ()
                 <> remainingOutputs
-                <> mustValidateIn (Interval.from nextTime)
+                <> mustValidateIn (Interval.from time)
                 <> mustBeSignedBy (vestingOwner vesting)
                 -- we don't need to add a pubkey output for 'vestingOwner' here
                 -- because this will be done by the wallet when it balances the

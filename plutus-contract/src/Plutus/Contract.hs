@@ -19,14 +19,19 @@ module Plutus.Contract(
     -- * Dealing with time
     , HasAwaitSlot
     , AwaitSlot
-    , awaitSlot
-    , currentSlot
-    , waitNSlots
-    , until
-    , when
-    , timeout
-    , between
-    , collectUntil
+    , AwaitSlot.awaitSlot
+    , AwaitSlot.currentSlot
+    , AwaitSlot.waitNSlots
+    , AwaitSlot.until
+    , AwaitSlot.when
+    , AwaitSlot.timeout
+    , AwaitSlot.between
+    , AwaitSlot.collectUntil
+    , HasAwaitTime
+    , AwaitTime
+    , AwaitTime.awaitTime
+    , AwaitTime.currentTime
+    , AwaitTime.waitNSeconds
     -- * Endpoints
     , HasEndpoint
     , EndpointDescription(..)
@@ -93,7 +98,10 @@ module Plutus.Contract(
 import           Data.Aeson                               (ToJSON (toJSON))
 import           Data.Row
 
-import           Plutus.Contract.Effects.AwaitSlot        as AwaitSlot
+import           Plutus.Contract.Effects.AwaitSlot        (AwaitSlot, HasAwaitSlot)
+import qualified Plutus.Contract.Effects.AwaitSlot        as AwaitSlot
+import           Plutus.Contract.Effects.AwaitTime        (AwaitTime, HasAwaitTime)
+import qualified Plutus.Contract.Effects.AwaitTime        as AwaitTime
 import           Plutus.Contract.Effects.AwaitTxConfirmed as AwaitTxConfirmed
 import           Plutus.Contract.Effects.ExposeEndpoint
 import           Plutus.Contract.Effects.Instance
@@ -119,6 +127,7 @@ import           Wallet.API                               (WalletAPIError)
 --   client & signing process)
 type BlockchainActions =
   AwaitSlot
+  .\/ AwaitTime
   .\/ WatchAddress
   .\/ WriteTx
   .\/ UtxoAt
@@ -129,6 +138,7 @@ type BlockchainActions =
 
 type HasBlockchainActions s =
   ( HasAwaitSlot s
+  , HasAwaitTime s
   , HasWatchAddress s
   , HasWriteTx s
   , HasUtxoAt s
@@ -142,7 +152,7 @@ type HasBlockchainActions s =
 both :: Contract w s e a -> Contract w s e b -> Contract w s e (a, b)
 both a b =
   let swap (b_, a_) = (a_, b_) in
-  ((,) <$> a <*> b) `select` (fmap swap ((,) <$> b <*> a))
+  ((,) <$> a <*> b) `select` fmap swap ((,) <$> b <*> a)
 
 -- | Log a message at the 'Debug' level
 logDebug :: ToJSON a => a -> Contract w s e ()

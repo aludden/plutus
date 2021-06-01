@@ -208,10 +208,10 @@ contribute cmp = do
     contributor <- ownPubKey
     let inst = scriptInstance cmp
         tx = Constraints.mustPayToTheScript (pubKeyHash contributor) contribValue
-                <> Constraints.mustValidateIn (Ledger.interval 1 (campaignDeadline cmp))
+                <> Constraints.mustValidateIn (Ledger.interval (TimeSlot.slotToPOSIXTime 1) (campaignDeadline cmp))
     txid <- fmap txId (submitTxConstraints inst tx)
 
-    utxo <- watchAddressUntil (Scripts.scriptAddress inst) (TimeSlot.posixTimeToSlot $ campaignCollectionDeadline cmp)
+    utxo <- watchAddressUntil (Scripts.scriptAddress inst) (campaignCollectionDeadline cmp)
 
     -- 'utxo' is the set of unspent outputs at the campaign address at the
     -- collection deadline. If 'utxo' still contains our own contribution
@@ -240,7 +240,7 @@ scheduleCollection cmp = do
     () <- endpoint @"schedule collection"
     logInfo @Text "Campaign started. Waiting for campaign deadline to collect funds."
 
-    _ <- awaitSlot (TimeSlot.posixTimeToSlot $ campaignDeadline cmp)
+    _ <- awaitTime (campaignDeadline cmp)
     unspentOutputs <- utxoAt (Scripts.scriptAddress inst)
 
     let tx = Typed.collectFromScript unspentOutputs Collect

@@ -43,7 +43,7 @@ import qualified Ledger.Ada              as Ada
 import qualified Ledger.Constraints      as Constraints
 import qualified Ledger.Contexts         as V
 import           Ledger.Scripts
-import qualified PlutusTx                as PlutusTx
+import qualified PlutusTx
 
 import qualified Ledger.Typed.Scripts    as Scripts
 import           Ledger.Value            (AssetClass, TokenName, Value)

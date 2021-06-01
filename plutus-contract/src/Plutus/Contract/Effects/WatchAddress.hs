@@ -5,7 +5,6 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE MonoLocalBinds      #-}
 {-# LANGUAGE NamedFieldPuns      #-}
-{-# LANGUAGE OverloadedLabels    #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeOperators       #-}
@@ -35,6 +34,7 @@ import qualified Ledger.Interval                   as Interval
 import           Ledger.Tx                         (txOutTxOut, txOutValue)
 import qualified Ledger.Value                      as V
 import           Plutus.Contract.Effects.AwaitSlot (HasAwaitSlot, awaitSlot, currentSlot)
+import           Plutus.Contract.Effects.AwaitTime (HasAwaitTime, awaitTime, currentTime)
 import           Plutus.Contract.Effects.UtxoAt    (HasUtxoAt, utxoAt)
 import           Plutus.Contract.Request           (ContractRow, requestMaybe)
 import           Plutus.Contract.Schema            (Event (..), Handlers (..), Input, Output)
@@ -100,7 +100,7 @@ nextTransactionsAt addr = do
 fundsAtAddressGt
     :: forall w s e.
        ( AsContractError e
-       , HasAwaitSlot s
+       , HasAwaitTime s
        , HasUtxoAt s
        )
     => Address
@@ -112,7 +112,7 @@ fundsAtAddressGt addr vl =
 fundsAtAddressCondition
     :: forall w s e.
        ( AsContractError e
-       , HasAwaitSlot s
+       , HasAwaitTime s
        , HasUtxoAt s
        )
     => (Value -> Bool)
@@ -121,11 +121,11 @@ fundsAtAddressCondition
 fundsAtAddressCondition condition addr = loopM go () where
     go () = do
         cur <- utxoAt addr
-        sl <- currentSlot
+        time <- currentTime
         let presentVal = foldMap (txOutValue . txOutTxOut) cur
         if condition presentVal
             then pure (Right cur)
-            else awaitSlot (sl + 1) >> pure (Left ())
+            else awaitTime (time + 1) >> pure (Left ())
 
 -- | Watch an address for changes, and return the outputs
 --   at that address when the total value at the address
@@ -133,7 +133,7 @@ fundsAtAddressCondition condition addr = loopM go () where
 fundsAtAddressGeq
     :: forall w s e.
        ( AsContractError e
-       , HasAwaitSlot s
+       , HasAwaitTime s
        , HasUtxoAt s
        )
     => Address
