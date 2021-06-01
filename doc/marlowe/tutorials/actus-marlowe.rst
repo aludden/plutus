@@ -83,7 +83,7 @@ ends). After that, two outcomes are possible
 -  the ``issuer`` deposits 1000 Lovelace in the ``investor``'s account,
    and that is then immediately paid to the ``investor`` in full;
 
--  if the ``investor`` doesn’t make the deposit, then the contract is
+-  if the ``issuer`` doesn’t make the deposit, then the contract is
    closed and all the money in the contract is refunded, but there is
    *no* money in the contract at this point, so the ``investor`` loses
    her money.
@@ -98,7 +98,7 @@ realistically, we could ask a third party to be a guarantor of the deal.
    **Exercise**
 
    Give a variant of the ``zeroCouponBond`` contract in which it is
-   necessary for the ``issuer`` to put the full value of the up before
+   necessary for the ``issuer`` to put the full value of the coupon before
    the bond is issued.
 
 ..
